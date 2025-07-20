@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NOVA GANG JUTI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Prompt', sans-serif;
+      background: #0a0d14;
+      color: #e0f2ff;
+      padding: 30px 20px;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('https://img5.pic.in.th/file/secure-sv1/ChatGPT-Image-Jul-2-2025-12_33_24-AM.png');
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      opacity: 0.1;
+      filter: brightness(0.5) blur(1px);
+      z-index: -1;
+    }
+
+    .title-card {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .title-card h1 {
+      font-size: 2.6rem;
+      color: #00ccff;
+      text-shadow: 0 0 15px #00ccffcc;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 1.2rem;
+      color: #a2cbdc;
+    }
+
+    .refresh-info, .timestamp {
+      font-size: 1rem;
+      color: #bbb;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .main-layout {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+
+    .panel {
+      background: #11141c;
+      border-radius: 18px;
+      border: 1px solid #1a2c3c;
+      box-shadow: 0 0 25px rgba(0, 255, 255, 0.06);
+      padding: 20px;
+      width: 320px;
+      min-height: 400px;
+    }
+
+    .panel h3 {
+      font-size: 1.2rem;
+      margin-bottom: 14px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(0, 204, 255, 0.1);
+      color: #00f7ff;
+      text-align: center;
+      text-shadow: 0 0 5px #00f7ff88;
+    }
+
+    .offline h3 {
+      background: rgba(255, 92, 92, 0.1);
+      color: #ff5c5c;
+    }
+
+    #timelineList {
+      max-height: 320px;
+      overflow-y: auto;
+      font-size: 1rem;
+      line-height: 1.6;
+      padding-left: 10px;
+    }
+
+    .player-card {
+      background: #1a2333;
+      border-left: 4px solid #00ffcc;
+      padding: 10px 12px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      font-size: 1rem;
+    }
+
+    .offline .player-card {
+      background: #31171d;
+      border-left-color: #ff4d4d;
+    }
+
+    .player-name {
+      font-weight: bold;
+      font-size: 1rem;
+    }
+
+    .player-meta {
+      font-size: 0.85rem;
+      color: #9ccfe0;
+    }
+
+    #toggleAudio, #clearTimeline {
+      position: fixed;
+      right: 20px;
+      z-index: 999;
+      background: #00ccff;
+      border: none;
+      color: #000;
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 0 10px #00ccff88;
+    }
+
+    #toggleAudio { bottom: 80px; }
+    #clearTimeline { bottom: 25px; }
+
+    @media (max-width: 960px) {
+      .main-layout {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .panel {
+        width: 90%;
+      }
+    }
+ </style>
+</head>
+<body>
+  <div class="title-card">
+    <h1>JUTI GANG IN NOVA</h1>
+    <div class="subtitle">REAL TIME TRACKER</div>
+    <div class="refresh-info" id="refreshNotice">DEV BY JUTI STORY</div>
+    <div class="timestamp" id="time">กำลังโหลด...</div>
+  </div>
+
+  <div class="main-layout">
+    <div class="panel offline">
+      <h3>🔴 ออฟไลน์ (<span id="offlineCount">0</span>)</h3>
+      <div id="offlineList"></div>
+    </div>
+
+    <div class="panel">
+      <h3>LOG เข้าเซิฟเวอร์</h3>
+      <div id="timelineList"></div>
+    </div>
+
+    <div class="panel online">
+      <h3>🟢 ออนไลน์ (<span id="onlineCount">0</span>)</h3>
+      <div id="onlineList"></div>
+    </div>
+  </div>
+
+  <audio id="alertSound" src="report.m4a" preload="auto"></audio>
+  <button id="toggleAudio">เปิดเสียงแจ้งเตือน</button>
+  <button id="clearTimeline">ล้าง Timeline</button>
+
+  <script>
+    let watchList = [];
+    let webhookUrl = '';
+    let previousOnline = [];
+    let alreadyNotified = new Set();
+    let audioEnabled = false;
+
+    document.getElementById("toggleAudio").addEventListener("click", () => {
+      audioEnabled = !audioEnabled;
+      document.getElementById("toggleAudio").innerText = audioEnabled ? "🔇 ปิดเสียงแจ้งเตือน" : "🔊 เปิดเสียงแจ้งเตือน";
+      if (audioEnabled) document.getElementById("alertSound").play().catch(() => {});
+    });
+
+    document.getElementById("clearTimeline").addEventListener("click", () => {
+      localStorage.removeItem("timelineLog");
+      updateTimelineDisplay();
+    });
+
+    function updateTimelineDisplay() {
+      const timeline = JSON.parse(localStorage.getItem("timelineLog") || "[]");
+      document.getElementById("timelineList").innerHTML = timeline.slice(0, 30).map(item => `<div>${item}</div>`).join('');
+    }
+
+    async function sendWebhook(message) {
+      if (!webhookUrl) return;
+      try {
+        await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: message })
+        });
+      } catch (err) {
+        console.error("Webhook error:", err);
+      }
+    }
+
+    async function checkPlayers() {
+      try {
+        const res = await fetch("https://dekhudbad.online/fivem/players?ip=141.11.158.31&port=30120");
+        const data = await res.json();
+        const players = Array.isArray(data) ? data : [];
+
+        const online = [], offline = [];
+        for (const name of watchList) {
+          const match = players.find(p => p.name?.toLowerCase() === name.toLowerCase());
+          if (match) online.push(match); else offline.push(name);
+        }
+
+        const newOnline = online.map(p => p.name);
+        const gonePlayers = previousOnline.filter(n => !newOnline.includes(n));
+        const newPlayers = newOnline.filter(n => !previousOnline.includes(n));
+
+        const timeline = JSON.parse(localStorage.getItem("timelineLog") || "[]");
+        const now = new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' });
+
+        for (const name of newPlayers) {
+          const msg = `🟢 ${name} เข้าเซิร์ฟ - ${now}`;
+          timeline.unshift(msg);
+          if (audioEnabled) document.getElementById("alertSound").play();
+          if (!alreadyNotified.has(name)) {
+            sendWebhook(msg);
+            alreadyNotified.add(name);
+          }
+        }
+
+        localStorage.setItem("timelineLog", JSON.stringify(timeline.slice(0, 100)));
+        updateTimelineDisplay();
+
+        previousOnline = newOnline;
+        document.getElementById("time").innerText = `อัปเดต: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`;
+        document.getElementById("onlineCount").innerText = online.length;
+        document.getElementById("offlineCount").innerText = offline.length;
+
+        document.getElementById("onlineList").innerHTML = online.map(p => `
+          <div class="player-card">
+            <div class="player-name">🟢 ${p.name}</div>
+            <div class="player-meta">Ping: ${p.ping ?? "-"} | ID: ${p.id ?? "-"}</div>
+          </div>`).join('');
+
+        document.getElementById("offlineList").innerHTML = offline.map(name => `
+          <div class="player-card">
+            <div class="player-name">🔴 ${name}</div>
+          </div>`).join('');
+
+      } catch (err) {
+        console.error("ตรวจสอบข้อมูลไม่สำเร็จ:", err);
+      }
+    }
+
+    async function init() {
+      try {
+        const config = await fetch("config.json").then(res => res.json());
+        watchList = config.watchList || [];
+        webhookUrl = config.webhookUrl || "";
+        updateTimelineDisplay();
+        checkPlayers();
+        setInterval(checkPlayers, 3000); // Realtime แบบเบาลงทุก 3 วิ
+      } catch (err) {
+        console.error("โหลด config.json ไม่ได้:", err);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
